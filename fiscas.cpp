@@ -4,19 +4,54 @@
 #include <string>
 #include <cstring>
 #include <cctype>
-#include <unordered_map>
 #include <vector>
 #include <cstdint>
+#include <iomanip>
+#include <algorithm>
 
-#define labelmaptype std::unordered_map<std::string, std::uint8_t>
+class LabelMap {
+public:
+    LabelMap() = default;
 
-void pass_one_parse_line(const std::string &line, uint8_t line_num, labelmaptype &map);
+    void insert(const std::string &key, uint8_t val) {
+        map_tool.emplace_back(key, val);
+    }
+
+    void print_labels() {
+        for (const auto &label: map_tool) {
+            std::cout << label.first << " \t";
+            std::cout << std::setw(2) << std::setfill('0') << std::hex
+                      << std::uppercase << label.second << std::endl;
+        }
+    }
+
+    uint8_t get_val(const std::string &key) {
+        for (auto &i: map_tool) {
+            if (i.first == key) {
+                int value = i.second;
+                return value;
+            }
+        }
+
+        throw std::out_of_range("No label found for the inserted key");
+    }
+
+private:
+    std::vector<std::pair<std::string, int>> map_tool;
+};
+
+void pass_one_parse_line(const std::string &line, int line_num, LabelMap &map);
+
 bool is_operand(const std::string &word);
-uint8_t pass_two_parse_line(std::string line, labelmaptype &map);
-int get_operation(const std::string &operation);
-int num_opers(int op);
-std::vector<int> get_oper_bits(const std::vector<std::string> &opers, labelmaptype &map);
 
+uint8_t pass_two_parse_line(std::string line, LabelMap &map);
+
+int get_operation(const std::string &operation);
+
+int num_opers(int op);
+
+std::vector<int>
+get_oper_bits(const std::vector<std::string> &opers, LabelMap &map);
 
 
 int command_line_error(char *str) {
@@ -35,6 +70,13 @@ std::string str_tolower(const std::string &str) {
     }
 
     return new_str;
+}
+
+bool check_line(const std::string &line) {
+    std::stringstream line_checker = std::stringstream(line);
+    std::string checker;
+    line_checker >> checker;
+    return checker.front() == ';';
 }
 
 int main(int argc, char *argv[]) {
@@ -59,31 +101,48 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    labelmaptype label_map;
+    LabelMap label_map;
 
     std::string line;
-    uint8_t line_num = 0;
+    int line_num = 0;
     while (getline(inputFile, line)) {
+        if (check_line(line)) {
+            // we skip comments
+            continue;
+        }
         pass_one_parse_line(line, line_num, label_map);
         line_num++;
     }
 
     inputFile = std::ifstream(argv[1]);
 
-    if (listing) {
-        std::cout << "*** LABEL LIST ***" << std::endl;
-        for (auto label: label_map) {
-            std::cout << label.first << "\t" << std::hex << std::uppercase  << label.second << std::endl;
+    line_num = 0;
+    std::vector<int> result_list;
+    while (getline(inputFile, line)) {
+        if (check_line(line)) {
+            // we skip comments
+            continue;
         }
-        std::cout << "*** MACHINE PROGRAM ***" << std::endl;
+        int result = pass_two_parse_line(line, label_map);
+
+        result_list.push_back(result);
+        line_num++;
     }
 
-    line_num = 0;
-    std::vector<uint8_t> result_list;
-    while (getline(inputFile, line)) {
-        uint8_t result = pass_two_parse_line(line, label_map);
-        if (listing) {
-            std::string word;
+    if (listing) {
+
+        std::cout << "*** LABEL LIST ***" << std::endl;
+        label_map.print_labels();
+        std::cout << "*** MACHINE PROGRAM ***" << std::endl;
+
+        std::string word;
+        line_num = 0;
+        inputFile = std::ifstream(argv[1]);
+        while (getline(inputFile, line)) {
+            if (check_line(line)) {
+                // we skip comments
+                continue;
+            }
             std::istringstream line_to_parse(line);
             std::ostringstream output_line;
 
@@ -93,20 +152,26 @@ int main(int argc, char *argv[]) {
                 line_to_parse = std::istringstream(line);
             }
 
-            output_line << std::dec << line_num << ":" << std::hex << std::uppercase << result << "\t";
+            output_line << std::setw(2) << std::setfill('0') << std::hex
+                        << std::uppercase << line_num << ":" << std::setw(2)
+                        << std::setfill('0') << result_list[line_num]
+                        << "\t";
             while (line_to_parse >> word) {
                 if (word.find(';') != std::string::npos) {
+                    output_line;
                     break;
+                }
+                if (not is_operand(word)) {
+                    output_line << " ";
                 }
                 output_line << word;
             }
             output_line << std::endl;
             std::cout << output_line.str();
+            line_num++;
         }
-
-        result_list.push_back(result);
-        line_num++;
     }
+
 
     std::ostream *output; // Default to standard output
     std::ofstream outputFile;
@@ -117,9 +182,10 @@ int main(int argc, char *argv[]) {
     }
     output = &outputFile;// Use file output if specified
 
-    (*output) << "v2.0 raw" << std::hex << std::uppercase << std::endl;
-    for (auto hex : result_list) {
-        (*output) << hex;
+    (*output) << "v2.0 raw" << std::endl;
+    for (auto hex: result_list) {
+        (*output) << std::setw(2) << std::setfill('0') << std::hex <<
+                  std::uppercase << hex << std::endl;
     }
 
     inputFile.close();
@@ -129,7 +195,8 @@ int main(int argc, char *argv[]) {
 }
 
 
-void pass_one_parse_line(const std::string &line, uint8_t line_num, labelmaptype &map) {
+void
+pass_one_parse_line(const std::string &line, int line_num, LabelMap &map) {
     std::string word;
     std::istringstream line_to_read(line);
 
@@ -145,40 +212,50 @@ void pass_one_parse_line(const std::string &line, uint8_t line_num, labelmaptype
         if (word.back() == ':') {
             word.pop_back();
         }
-        map[word] = line_num;
+        map.insert(word, line_num);
     }
 }
 
-uint8_t pass_two_parse_line(std::string line, labelmaptype &map) {
+uint8_t pass_two_parse_line(std::string line, LabelMap &map) {
     std::string word;
     std::istringstream line_to_read(line);
 
     line_to_read >> word;
-    while (not is_operand(word)) {
+    if (not is_operand(word)) {
+        auto temp = word;
         line_to_read >> word;
+        if (not is_operand(word)) {
+            std::cerr << temp << " is an invalid operation" << std::endl;
+            exit(1);
+        }
     }
 
     int op = get_operation(word);
     if (op > 3 or op < 0) {
-        std::cerr << word << " is an invalid operation";
+        std::cerr << word << " is an invalid operation" << std::endl;
         exit(1);
     }
 
     int num_operands = num_opers(op);
     std::vector<std::string> operands;
-    while (word.front() != ';' or not line_to_read.eof()) {
-        line_to_read >> word;
+    while (line_to_read >> word) {
+        if (word.find(';') != std::string::npos) {
+            break;
+        }
 
         operands.push_back(word);
     }
 
     if (static_cast<int>(operands.size()) != num_operands) {
         std::cerr << "Invalid number of operations: " << operands.size()
-                  << ", when there should be: " << num_operands;
+                  << ", when there should be: " << num_operands << std::endl;
         exit(1);
     }
 
     std::vector<int> operand_bits = get_oper_bits(operands, map);
+    int dest_bit = operand_bits.front();
+    operand_bits.erase(operand_bits.begin());
+    operand_bits.push_back(dest_bit);
     uint8_t line_byte = 0;
     line_byte = line_byte << 2 | op;
     if (num_operands == 1) {
@@ -196,10 +273,12 @@ uint8_t pass_two_parse_line(std::string line, labelmaptype &map) {
     return line_byte;
 }
 
-std::vector<int> get_oper_bits(const std::vector<std::string> &opers, labelmaptype &map) {
+std::vector<int>
+get_oper_bits(const std::vector<std::string> &opers, LabelMap &map) {
     std::vector<int> bits;
     if (static_cast<int>(opers.size()) == 1) {
-        bits.push_back(map[opers.front()]);
+        int val = map.get_val(opers[0]);
+        bits.push_back(val);
     } else {
         for (auto oper: opers) {
             oper = str_tolower(oper);

@@ -289,8 +289,8 @@ pass_one_parse_line(const std::string &line, int &line_num, LabelMap &map) {
         }
 
         if (map.value_in_map(word)) {
-            std::cerr << "Label " << word << " is already defined" <<
-            std::endl;
+            std::cerr << "Label " << word << " on line " << line_num <<
+                " is already defined" << std::endl;
             exit(1);
         }
         map.insert(word, real_line);
@@ -365,13 +365,27 @@ get_oper_bits(const std::vector<std::string> &opers, LabelMap &map,
               const int &line_num) {
     std::vector<int> bits;
     if (static_cast<int>(opers.size()) == 1) {
-        try {
-            int val = map.get_val(opers[0], line_num);
+        if (std::all_of(opers.front().begin(), opers.front().end(),
+                                ::isdigit)) {
+            std::stringstream oper(opers.front());
+            int val = 0;
+            oper >> val;
+            if (val > 63) {
+                std::cerr << "Attempting to branch to code outside of system"
+                             " memory on line " << line_num;
+                exit(1);
+            }
             bits.push_back(val);
-        } catch (std::out_of_range &e) {
-            std::cerr << e.what();
-            exit(1);
+        } else {
+            try {
+                int val = map.get_val(opers[0], line_num);
+                bits.push_back(val);
+            } catch (std::out_of_range &e) {
+                std::cerr << e.what();
+                exit(1);
+            }
         }
+
 
     } else {
         for (auto oper: opers) {

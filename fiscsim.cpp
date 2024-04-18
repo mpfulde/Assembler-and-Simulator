@@ -120,6 +120,12 @@ void decode_and_run(std::ifstream &file, int cycles, bool disassemble) {
 
     for (auto cur_cycle = 1; cur_cycle <= cycles; cur_cycle++) {
 
+        // example: pc attempts to 62 but line 62 is not defined
+        if (r.pc >= lines.size()) {
+            std::cerr << "Attempting to jump to code outside of instruction "
+                         "memory " << std::endl;
+            exit(1);
+        }
         instruction = std::strtol(lines.at(r.pc).c_str(), nullptr, 16);
 
         int op = instruction >> bnz_instruct_bits;
@@ -219,7 +225,7 @@ void decode_and_run(std::ifstream &file, int cycles, bool disassemble) {
                     break;
                 case 3:
                     std::cout << "bnz ";
-                    std::cout << remaining_bits;
+                    std::cout << std::dec << remaining_bits;
                     std::cout << std::endl << std::endl;
                     break;
                 default:

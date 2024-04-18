@@ -7,61 +7,6 @@ start:  not r0 r1
         not r1 r1       ; not 254 = 1
 loop:   and r3 r0 r0    ; r3 now has zero
         add r0 r0 r1    ; increment by 1
-        bnz loop        ; repeat until r0=256=0
+        bnz 62        ; repeat until r0=256=0
         and r3 r3 r3    ; and r3 with itself to set flags
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-        add r0 r0 r0    ;
-
-;stop:   bnz stop        ; r3 is never zero, effectively stop
+stop:   bnz stop        ; r3 is never zero, effectively stop

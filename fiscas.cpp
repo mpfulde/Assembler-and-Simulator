@@ -19,13 +19,15 @@ public:
 
     void print_labels() {
         for (const auto &label: map_tool) {
-            std::cout << label.first << " \t";
+            std::cout << std::setw(7) << std::setfill(' ') << std::left
+                      << label.first << " ";
             std::cout << std::setw(2) << std::setfill('0') << std::hex
-                      << std::uppercase << label.second << std::endl;
+                      << std::uppercase <<  std::right
+                      << label.second << std::endl;
         }
     }
 
-    uint8_t get_val(const std::string &key) {
+    uint8_t get_val(const std::string &key, int line_num) {
         for (auto &i: map_tool) {
             if (i.first == key) {
                 int value = i.second;
@@ -33,29 +35,56 @@ public:
             }
         }
 
-        throw std::out_of_range("No label found for the inserted key");
+        // line_num is only used for the error message
+        std::stringstream line;
+        line << "Label " << key << " at line " << line_num << " not in the "
+                    "symbol table" << std::endl;
+        throw std::out_of_range(line.str());
+    }
+
+    bool value_in_map(const std::string &key) {
+        try {
+            get_val(key, -1 /* this value doesnt matter*/);
+        } catch (std::out_of_range& e) {
+            return false;
+        }
+
+        return true;
     }
 
 private:
     std::vector<std::pair<std::string, int>> map_tool;
 };
 
-void pass_one_parse_line(const std::string &line, int line_num, LabelMap &map);
+class SkipLineE : private std::runtime_error {
+
+public:
+    explicit SkipLineE(char const* const message) noexcept
+    : std::runtime_error(message){}
+
+    char const* what() const noexcept override {
+        return std::runtime_error::what();
+    }
+};
+
+void pass_one_parse_line(const std::string &line, int &line_num, LabelMap &map);
 
 bool is_operand(const std::string &word);
 
-uint8_t pass_two_parse_line(std::string line, LabelMap &map);
+uint8_t pass_two_parse_line(const std::string &line, LabelMap &map,
+                            const int &line_num);
 
 int get_operation(const std::string &operation);
 
 int num_opers(int op);
 
 std::vector<int>
-get_oper_bits(const std::vector<std::string> &opers, LabelMap &map);
+get_oper_bits(const std::vector<std::string> &opers, LabelMap &map,
+              const int &line_num);
 
 
 int command_line_error(char *str) {
-    std::cerr << "Usage: " << str << " <source file> <object file> [-1]\n";
+    std::cerr << "Usage: " << str << " <source file> <object file> [-l]\n";
     std::cerr << "\t\t-l : print listing to standard error\n";
     return 1;
 }
@@ -110,6 +139,14 @@ int main(int argc, char *argv[]) {
             // we skip comments
             continue;
         }
+
+        // if the file inputted contains more than 64 lines of code (0-63)
+        if (line_num >= 64) {
+            std::cerr << "File inputted is larger than system memory" <<
+                      std::endl;
+            exit(1);
+        }
+
         pass_one_parse_line(line, line_num, label_map);
         line_num++;
     }
@@ -123,7 +160,20 @@ int main(int argc, char *argv[]) {
             // we skip comments
             continue;
         }
-        int result = pass_two_parse_line(line, label_map);
+
+        // if the file inputted contains more than 64 lines of code (0-63)
+        if (line_num >= 64) {
+            std::cerr << "File inputted is larger than system memory" <<
+            std::endl;
+            exit(1);
+        }
+
+        int result;
+        try {
+            result = pass_two_parse_line(line, label_map, line_num);
+        } catch (SkipLineE& e) {
+            continue;
+        }
 
         result_list.push_back(result);
         line_num++;
@@ -143,13 +193,24 @@ int main(int argc, char *argv[]) {
                 // we skip comments
                 continue;
             }
+
+
+
             std::istringstream line_to_parse(line);
             std::ostringstream output_line;
 
+            std::string word2;
+
             // gets rid of the label
             line_to_parse >> word;
+            line_to_parse >> word2;
             if (is_operand(word)) {
                 line_to_parse = std::istringstream(line);
+            } else if (is_operand(word2)) {
+                line_to_parse = std::istringstream(line);
+                line_to_parse >> word;
+            } else if (word2.empty() or word2.front() == ';') {
+                continue;
             }
 
             output_line << std::setw(2) << std::setfill('0') << std::hex
@@ -158,7 +219,6 @@ int main(int argc, char *argv[]) {
                         << "\t";
             while (line_to_parse >> word) {
                 if (word.find(';') != std::string::npos) {
-                    output_line;
                     break;
                 }
                 if (not is_operand(word)) {
@@ -196,12 +256,14 @@ int main(int argc, char *argv[]) {
 
 
 void
-pass_one_parse_line(const std::string &line, int line_num, LabelMap &map) {
+pass_one_parse_line(const std::string &line, int &line_num, LabelMap &map) {
     std::string word;
     std::istringstream line_to_read(line);
 
     //  check if first word is one of the 4 operands (ie if its a lable or op)
     line_to_read >> word;
+
+    int real_line = line_num;
 
     // checks if the first word is a comment
     if (word.front() == ';') {
@@ -211,12 +273,32 @@ pass_one_parse_line(const std::string &line, int line_num, LabelMap &map) {
         // remove last character from the string
         if (word.back() == ':') {
             word.pop_back();
+        } else {
+            return;
         }
-        map.insert(word, line_num);
+
+
+        std::string word2;
+        line_to_read >> word2;
+        if (word2.empty()) {
+            line_num--;
+        } else {
+            if (word2.find(';') != std::string::npos) {
+                line_num--;
+            }
+        }
+
+        if (map.value_in_map(word)) {
+            std::cerr << "Label " << word << " is already defined" <<
+            std::endl;
+            exit(1);
+        }
+        map.insert(word, real_line);
     }
 }
 
-uint8_t pass_two_parse_line(std::string line, LabelMap &map) {
+uint8_t pass_two_parse_line(const std::string &line, LabelMap &map,
+                            const int &line_num) {
     std::string word;
     std::istringstream line_to_read(line);
 
@@ -224,8 +306,12 @@ uint8_t pass_two_parse_line(std::string line, LabelMap &map) {
     if (not is_operand(word)) {
         auto temp = word;
         line_to_read >> word;
+        if (word == temp or word.front() == ';') {
+            throw SkipLineE ("skip line");
+        }
         if (not is_operand(word)) {
-            std::cerr << temp << " is an invalid operation" << std::endl;
+            std::cerr << (map.value_in_map(temp) ? word : temp)
+                      << " is an invalid operation" << std::endl;
             exit(1);
         }
     }
@@ -252,7 +338,8 @@ uint8_t pass_two_parse_line(std::string line, LabelMap &map) {
         exit(1);
     }
 
-    std::vector<int> operand_bits = get_oper_bits(operands, map);
+    std::vector<int> operand_bits = get_oper_bits(operands, map,
+                                                  line_num);
     int dest_bit = operand_bits.front();
     operand_bits.erase(operand_bits.begin());
     operand_bits.push_back(dest_bit);
@@ -274,11 +361,18 @@ uint8_t pass_two_parse_line(std::string line, LabelMap &map) {
 }
 
 std::vector<int>
-get_oper_bits(const std::vector<std::string> &opers, LabelMap &map) {
+get_oper_bits(const std::vector<std::string> &opers, LabelMap &map,
+              const int &line_num) {
     std::vector<int> bits;
     if (static_cast<int>(opers.size()) == 1) {
-        int val = map.get_val(opers[0]);
-        bits.push_back(val);
+        try {
+            int val = map.get_val(opers[0], line_num);
+            bits.push_back(val);
+        } catch (std::out_of_range &e) {
+            std::cerr << e.what();
+            exit(1);
+        }
+
     } else {
         for (auto oper: opers) {
             oper = str_tolower(oper);

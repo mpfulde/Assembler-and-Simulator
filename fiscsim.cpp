@@ -33,7 +33,6 @@ public:
 };
 
 int command_line_error(const std::string& str) {
-    str.substr(1, str.find('/'));
     std::cerr << "Usage: " << str << " <object file> [cycles] [-d]\n";
     std::cerr << "\t\t-d : print disassembly listing with each cycle\n";
     std::cerr << "\t\tif cycles are unspecified the CPU will run for 20 "
@@ -121,11 +120,16 @@ void decode_and_run(std::ifstream &file, int cycles, bool disassemble) {
     for (auto cur_cycle = 1; cur_cycle <= cycles; cur_cycle++) {
 
         // example: pc attempts to 62 but line 62 is not defined
-        if (r.pc >= lines.size()) {
+        if (r.pc > lines.size()) {
             std::cerr << "Attempting to jump to code outside of instruction "
                          "memory " << std::endl;
             exit(1);
         }
+
+        if (r.pc == lines.size()) {
+            return;
+        }
+
         instruction = std::strtol(lines.at(r.pc).c_str(), nullptr, 16);
 
         int op = instruction >> bnz_instruct_bits;
@@ -170,7 +174,6 @@ void decode_and_run(std::ifstream &file, int cycles, bool disassemble) {
                     r.pc = location;
                 } else {
                     r.pc++;
-                    r.z = false;
                 }
 
 
@@ -193,7 +196,7 @@ void decode_and_run(std::ifstream &file, int cycles, bool disassemble) {
         std::cout << " R2: " << std::setw(2) << std::setfill('0') <<
                     std::hex << std::uppercase << static_cast<int>(r.regs[2]);
         std::cout << " R3: " << std::setw(2) << std::setfill('0') <<
-                    std::hex << std::uppercase << static_cast<int>(r.regs[3]);
+                    std::dec << std::uppercase << static_cast<int>(r.regs[3]);
         std::cout << std::endl;
         if (disassemble) {
             std::cout << "Disassembly: ";

@@ -83,7 +83,7 @@ get_oper_bits(const std::vector<std::string> &opers, LabelMap &map,
               const int &line_num);
 
 
-int command_line_error(char *str) {
+int command_line_error(const std::string &str) {
     std::cerr << "Usage: " << str << " <source file> <object file> [-l]\n";
     std::cerr << "\t\t-l : print listing to standard error\n";
     return 1;
@@ -269,6 +269,12 @@ pass_one_parse_line(const std::string &line, int &line_num, LabelMap &map) {
     if (word.front() == ';') {
         return;
     }
+    // checks if the line is only whitespace
+    else if (std::all_of(word.begin(), word.end(), ::isspace)) {
+        line_num--;
+        return;
+    }
+
     if (not is_operand(word)) {
         // remove last character from the string
         if (word.back() == ':') {

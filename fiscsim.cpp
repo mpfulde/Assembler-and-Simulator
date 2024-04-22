@@ -196,7 +196,7 @@ void decode_and_run(std::ifstream &file, int cycles, bool disassemble) {
         std::cout << " R2: " << std::setw(2) << std::setfill('0') <<
                     std::hex << std::uppercase << static_cast<int>(r.regs[2]);
         std::cout << " R3: " << std::setw(2) << std::setfill('0') <<
-                    std::dec << std::uppercase << static_cast<int>(r.regs[3]);
+                    std::hex << std::uppercase << static_cast<int>(r.regs[3]);
         std::cout << std::endl;
         if (disassemble) {
             std::cout << "Disassembly: ";
